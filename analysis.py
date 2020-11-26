@@ -175,7 +175,7 @@ function drawChart() {{
 
             for id, item in enumerate(
                 [
-                    [ u'カテゴリ:内訳', payment_label_list, category_items_dict, 900 ],
+                    [ u'全カテゴリ', payment_label_list, category_items_dict, 900 ],
                     #[ u'口座', category_label_list, payment_src_items_dict ],
                 ] + category_main_data_list
             ):
@@ -198,11 +198,12 @@ function drawChart() {{
                 src_key_list = items_dict.keys()
                 src_key_list = sorted( src_key_list )
 
-                get_data = 0 # No payment の場合は html に追加しない
+                total_payment = 0.0
 
                 for src_key in src_key_list:
 
                     payment_list = items_dict[ src_key ]
+
                     if sum( payment_list ) == 0.0: # No payment
                         continue
 
@@ -211,14 +212,14 @@ function drawChart() {{
 
                     data_row_list.append( u'        [{0}]'.format( ','.join( row_item_list ) ) )
 
-                    get_data = 1
+                    total_payment += sum( payment_list )
 
-                if not get_data:
+                if len( data_row_list ) <= 1: # column row しかない場合
                     continue
 
                 script_line_list.append( get_html_chart_script_line_tmp().format(
                     **{
-                        'title': input_first_label,
+                        'title': u'{0}: ￥{1}'.format( input_first_label, int(total_payment) ),
                         'datas': u',\n'.join( data_row_list ),
                         'id': u'data{0:02d}'.format( id ),
                         'width': 1800,
