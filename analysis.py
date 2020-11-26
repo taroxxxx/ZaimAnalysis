@@ -13,6 +13,8 @@ import glob
 import codecs
 import traceback
 
+from operator import itemgetter
+
 
 if __name__ == '__main__':
 
@@ -104,6 +106,7 @@ function drawChart() {{
 
             for line in lines[1:]: # 0 = columun 列 除外
                 payment_label_list.append( to_utf( line[4] ) ) # 支払元
+                #category_label_list.append( get_category_label( line ) ) # カテゴリ:内訳
                 category_label_list.append( get_category_label( line ) ) # カテゴリ:内訳
                 category_main_label_list.append( to_utf( line[2] ) ) # カテゴリ
 
@@ -114,7 +117,6 @@ function drawChart() {{
             # data の取得
             category_items_dict = {} # カテゴリ:内訳
             payment_src_items_dict = {} # 口座
-
             category_main_items_items_dict = {} # カテゴリ
 
             for line in lines[1:]: # 0 = columun 列 除外
@@ -129,13 +131,13 @@ function drawChart() {{
 
                 category_label = get_category_label( line ) # カテゴリ:内訳
 
-                # カテゴリ:内訳
-                if not category_items_dict.has_key( category_label ):
+                # カテゴリ
+                if not category_items_dict.has_key( category_main ):
                     init_list = [ 0.0 ] * len( payment_label_list )
-                    category_items_dict[ category_label ] = init_list
+                    category_items_dict[ category_main ] = init_list
 
                 index = payment_label_list.index( payment_src )
-                category_items_dict[ category_label ][ index ] += payment_price
+                category_items_dict[ category_main ][ index ] += payment_price
 
                 # 口座
                 if not payment_src_items_dict.has_key( payment_src ):
@@ -145,7 +147,7 @@ function drawChart() {{
                 index = category_label_list.index( category_label )
                 payment_src_items_dict[ payment_src ][ index ] += payment_price
 
-                # カテゴリ
+                # カテゴリ/内訳
                 if not category_main_items_items_dict.has_key( category_main ):
                     category_main_items_items_dict[ category_main ] = {}
 
@@ -157,8 +159,8 @@ function drawChart() {{
                 category_main_items_items_dict[ category_main ][ category_sub ][ index ] += payment_price
 
             # ColumnChart
-            script_line_list = []
             div_line_list = []
+            script_line_list = []
 
             # カテゴリ ごとに分ける
             category_main_data_list = []
@@ -175,9 +177,10 @@ function drawChart() {{
 
             for id, item in enumerate(
                 [
-                    [ u'全カテゴリ', payment_label_list, category_items_dict, 900 ],
-                    #[ u'口座', category_label_list, payment_src_items_dict ],
-                ] + category_main_data_list
+                    [ u'カテゴリ別', payment_label_list, category_items_dict, 900 ]
+                ] + category_main_data_list + [
+                    [ u'口座別', category_label_list, payment_src_items_dict, 900 ]
+                ]
             ):
 
                 input_first_label = item[0]
@@ -198,6 +201,15 @@ function drawChart() {{
                 src_key_list = items_dict.keys()
                 src_key_list = sorted( src_key_list )
 
+                # 項目の金額順に
+                src_key_item_list = []
+                for src_key in src_key_list:
+                    payment_list = items_dict[ src_key ]
+                    src_key_item_list.append( [ src_key, sum( payment_list ) ] )
+
+                src_key_item_list = sorted( src_key_item_list, key=itemgetter( 1 ) )
+                src_key_list = [ item[0] for item in src_key_item_list ]
+
                 total_payment = 0.0
 
                 for src_key in src_key_list:
@@ -209,7 +221,7 @@ function drawChart() {{
 
                     row_item_list = [ u'{0}'.format( item ) for item in payment_list ]
                     row_item_list[0:0] = [ u"'{0}'".format( src_key ) ] # column の先頭に追加
-
+                    # 金額 row
                     data_row_list.append( u'        [{0}]'.format( ','.join( row_item_list ) ) )
 
                     total_payment += sum( payment_list )
@@ -228,9 +240,7 @@ function drawChart() {{
                 ) )
 
                 div_line_list.append( get_html_div_line_tmp().format(
-                    **{
-                        'id': u'data{0:02d}'.format( id ),
-                    }
+                    **{ 'id': u'data{0:02d}'.format( id ) }
                 ) )
 
             # html
