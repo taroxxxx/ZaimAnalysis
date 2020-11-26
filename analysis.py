@@ -6,10 +6,13 @@ Zaim の記録データを 文字コード=Shift-JIS 形式でダウンロード
 """
 
 import os
+import re
 import csv
 import sys
 import copy
 import glob
+import time
+import datetime
 import codecs
 import traceback
 
@@ -29,7 +32,7 @@ if __name__ == '__main__':
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title>Zaim</title>
+<title>Zaim: {date}</title>
 <head>
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script type="text/javascript">google.charts.load("current", {{packages:["timeline", "corechart"]}});</script>
@@ -86,7 +89,54 @@ function drawChart() {{
         return tmp_list
 
 
+    def date_str_to_datetime( date_str ):
+
+        date_str_fmt = re.compile( r'(?P<y>[\d]+)-(?P<m>[\d]+)-(?P<d>[\d]+)' )
+        date_str_search = date_str_fmt.search( date_str )
+
+        if date_str_search != None:
+
+            y = int( date_str_search.group( 'y' ) )
+            m = int( date_str_search.group( 'm' ) )
+            d = int( date_str_search.group( 'd' ) )
+
+            return datetime.datetime( y,m,d )
+
+        return None
+
+
+    def datetime_to_time( src_d ):
+
+        """
+        datetime@src_d
+        """
+        return time.mktime( src_d.timetuple() )
+
+
+    def src_time_to_str( src_time, tmp=u'{year}/{month}/{day}' ):
+
+        """
+        # 入力時間をテキストで返す
+
+        i@src_time : time
+        s@tmp : テキストテンプレート
+        """
+        d = datetime.datetime.fromtimestamp( src_time )
+
+        fmt_dict = {
+            'year' : d.year,
+            'month' : d.month,
+            'day' : d.day,
+            'weekday_utf' : [u'月',u'火',u'水',u'木',u'金',u'土',u'日'][d.weekday()],
+        }
+
+        return tmp.format( **fmt_dict ) if src_time else '-'*5
+
     try:
+
+        def ___main___():
+            pass
+
         # get .csv
         cur_dir_path =  os.path.abspath( r'.' )
         csv_file_path_list = glob.glob( os.path.join( cur_dir_path, r'*.csv' ) )
@@ -99,7 +149,7 @@ function drawChart() {{
                 for line in csv.reader( f ):
                     lines.append( line )
 
-            # column label を取得
+            """ Columun を取得 """
             payment_label_list = []
             category_label_list = []
             category_main_label_list = []
@@ -114,14 +164,17 @@ function drawChart() {{
             category_label_list = set_sorted_list( category_label_list )
             category_main_label_list = set_sorted_list( category_main_label_list )
 
-            # data の取得
+            """ line ごとに集計 """
             category_items_dict = {} # カテゴリ:内訳
             payment_src_items_dict = {} # 口座
             category_main_items_items_dict = {} # カテゴリ
 
+            time_list = []
+
             for line in lines[1:]: # 0 = columun 列 除外
 
                 # get line data
+                date = line[0] # 日付
                 method = line[1] # 方法
                 category_main = to_utf( line[2] ) # カテゴリ
                 category_sub = to_utf( line[3] ) # 内訳
@@ -130,6 +183,8 @@ function drawChart() {{
                 payment_price = int( line[11] ) # 支出
 
                 category_label = get_category_label( line ) # カテゴリ:内訳
+
+                time_list.append( datetime_to_time( date_str_to_datetime( date ) ) )
 
                 # カテゴリ
                 if not category_items_dict.has_key( category_main ):
@@ -158,28 +213,46 @@ function drawChart() {{
                 index = payment_label_list.index( payment_src )
                 category_main_items_items_dict[ category_main ][ category_sub ][ index ] += payment_price
 
-            # ColumnChart
-            div_line_list = []
-            script_line_list = []
+            time_list = sorted( time_list )
+
+            """ Chart ごとに整理 """
+
+            # カテゴリの金額順に
+            category_main_key_item_list = []
+            for category_main_key in category_main_items_items_dict:
+
+                total_payment = 0.0
+                for category_sub_key in category_main_items_items_dict[ category_main_key ]:
+                    payment_list = category_main_items_items_dict[ category_main_key ][ category_sub_key ]
+                    total_payment += sum( payment_list )
+
+                category_main_key_item_list.append( [ category_main_key, total_payment ] )
+
+            category_main_key_item_list = sorted( category_main_key_item_list, key=itemgetter( 1 ) )
+            category_main_key_list = [ item[0] for item in category_main_key_item_list ]
+            category_main_key_list = sorted( category_main_key_list, reverse=1 ) # 金額が高い順に
 
             # カテゴリ ごとに分ける
             category_main_data_list = []
-            for category_main_key in category_main_items_items_dict:
+            for category_main_key in category_main_key_list:
                 category_main_data_list.append(
                     [
                         category_main_key,
                         payment_label_list,
                         category_main_items_items_dict[ category_main_key ],
-                        450
+                        300
                     ]
                 )
 
+            # Chart script line の作成
+            div_line_list = []
+            script_line_list = []
 
             for id, item in enumerate(
                 [
-                    [ u'カテゴリ別', payment_label_list, category_items_dict, 900 ]
+                    [ u'カテゴリ別', payment_label_list, category_items_dict, 600 ]
                 ] + category_main_data_list + [
-                    [ u'口座別', category_label_list, payment_src_items_dict, 900 ]
+                    [ u'口座別', category_label_list, payment_src_items_dict, 600 ]
                 ]
             ):
 
@@ -193,7 +266,9 @@ function drawChart() {{
 
                 data_row_list = []
                 data_row_list.append(
-                    u'        [{0}]'.format( ','.join( u"'{0}'".format( item ) for item in label_list ) )
+                    u"        [{0},{{ role: 'annotation' }}]".format(
+                        ','.join( u"'{0}'".format( item ) for item in label_list )
+                    )
                 )
 
                 items_dict = copy.copy( input_items_dict )
@@ -222,7 +297,9 @@ function drawChart() {{
                     row_item_list = [ u'{0}'.format( item ) for item in payment_list ]
                     row_item_list[0:0] = [ u"'{0}'".format( src_key ) ] # column の先頭に追加
                     # 金額 row
-                    data_row_list.append( u'        [{0}]'.format( ','.join( row_item_list ) ) )
+                    data_row_list.append( u"        [{0},'¥{1}']".format(
+                        ','.join( row_item_list ), int( sum( payment_list ) )
+                    ) )
 
                     total_payment += sum( payment_list )
 
@@ -231,7 +308,7 @@ function drawChart() {{
 
                 script_line_list.append( get_html_chart_script_line_tmp().format(
                     **{
-                        'title': u'{0}: ￥{1}'.format( input_first_label, int(total_payment) ),
+                        'title': u'{0}: ¥{1}'.format( input_first_label, int(total_payment) ),
                         'datas': u',\n'.join( data_row_list ),
                         'id': u'data{0:02d}'.format( id ),
                         'width': 1800,
@@ -243,16 +320,21 @@ function drawChart() {{
                     **{ 'id': u'data{0:02d}'.format( id ) }
                 ) )
 
-            # html
+            """ html """
             html_line = get_html_line_tmp().format(
                 **{
+                    'date': u'{0}-{1}'.format(
+                        src_time_to_str( min(time_list) ), src_time_to_str( max(time_list) )
+                    ),
                     'script_lines': '\n'.join( script_line_list ),
                     'div_lines': '\n'.join( div_line_list ),
                 }
             )
 
-            basename = os.path.basename( csv_file_path )
-            basename, ext = os.path.splitext( basename )
+            basename = 'Zaim_{0}'.format(
+                src_time_to_str( min(time_list), '{year}_{month}' ),
+            )
+
             html_file_path = os.path.abspath( '{0}.html'.format( basename ) )
 
             with codecs.open( html_file_path, 'w', 'utf-8' ) as f:
