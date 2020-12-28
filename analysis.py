@@ -81,6 +81,14 @@ function drawChart() {{
         return u'{0}:{1}'.format( category_main, category_sub )
 
 
+    def get_transfer_label( line ):
+
+        payment_src = to_utf( line[4] ) # 支払元
+        income_dst = to_utf( line[5] ) # 入金先
+
+        return u'{0}>{1}'.format( payment_src, income_dst )
+
+
     def set_sorted_list( tmp_list ):
 
         tmp_list = [ item for item in set( tmp_list ) ]
@@ -153,21 +161,29 @@ function drawChart() {{
             payment_label_list = []
             category_label_list = []
             category_main_label_list = []
+            income_label_list = []
+            transfer_label_list = []
 
             for line in lines[1:]: # 0 = columun 列 除外
+
                 payment_label_list.append( to_utf( line[4] ) ) # 支払元
-                #category_label_list.append( get_category_label( line ) ) # カテゴリ:内訳
-                category_label_list.append( get_category_label( line ) ) # カテゴリ:内訳
                 category_main_label_list.append( to_utf( line[2] ) ) # カテゴリ
+                category_label_list.append( get_category_label( line ) ) # カテゴリ:内訳
+                income_label_list.append( to_utf( line[5] ) ) # 入金先
+                transfer_label_list.append( get_transfer_label( line ) ) # 振替: 支払元>入金先
 
             payment_label_list = set_sorted_list( payment_label_list )
+            income_label_list = set_sorted_list( income_label_list )
+            transfer_label_list = set_sorted_list( transfer_label_list )
             category_label_list = set_sorted_list( category_label_list )
             category_main_label_list = set_sorted_list( category_main_label_list )
 
             """ line ごとに集計 """
-            category_items_dict = {} # カテゴリ:内訳
-            payment_src_items_dict = {} # 口座
-            category_main_items_items_dict = {} # カテゴリ
+            category_items_dict = {} # 支出: カテゴリ:内訳:
+            payment_src_items_dict = {} # 支出: 口座
+            category_main_items_items_dict = {} # 支出: カテゴリ
+            income_dst_items_dict = {} # 収入: 口座:
+            transfer_items_dict = {} # 振替
 
             time_list = []
 
@@ -179,14 +195,17 @@ function drawChart() {{
                 category_main = to_utf( line[2] ) # カテゴリ
                 category_sub = to_utf( line[3] ) # 内訳
                 payment_src = to_utf( line[4] ) # 支払元
+                income_dst = to_utf( line[5] ) # 入金先
                 income_price = int( line[10] ) # 収入
                 payment_price = int( line[11] ) # 支出
+                transfer_price = int( line[12] ) # 振替
 
                 category_label = get_category_label( line ) # カテゴリ:内訳
+                transfer_label = get_transfer_label( line ) # 振替: 支払元>入金先
 
                 time_list.append( datetime_to_time( date_str_to_datetime( date ) ) )
 
-                # カテゴリ
+                # カテゴリ別: 口座毎の支出
                 if not category_items_dict.has_key( category_main ):
                     init_list = [ 0.0 ] * len( payment_label_list )
                     category_items_dict[ category_main ] = init_list
@@ -194,15 +213,8 @@ function drawChart() {{
                 index = payment_label_list.index( payment_src )
                 category_items_dict[ category_main ][ index ] += payment_price
 
-                # 口座
-                if not payment_src_items_dict.has_key( payment_src ):
-                    init_list = [ 0.0 ] * len( category_label_list )
-                    payment_src_items_dict[ payment_src ] = init_list
 
-                index = category_label_list.index( category_label )
-                payment_src_items_dict[ payment_src ][ index ] += payment_price
-
-                # カテゴリ/内訳
+                # カテゴリ/内訳別: 口座毎の支出
                 if not category_main_items_items_dict.has_key( category_main ):
                     category_main_items_items_dict[ category_main ] = {}
 
@@ -212,6 +224,33 @@ function drawChart() {{
 
                 index = payment_label_list.index( payment_src )
                 category_main_items_items_dict[ category_main ][ category_sub ][ index ] += payment_price
+
+
+                # 口座別: カテゴリ毎の支出
+                if not payment_src_items_dict.has_key( payment_src ):
+                    init_list = [ 0.0 ] * len( category_label_list )
+                    payment_src_items_dict[ payment_src ] = init_list
+
+                index = category_label_list.index( category_label )
+                payment_src_items_dict[ payment_src ][ index ] += payment_price
+
+                # 口座別: カテゴリ毎の収入
+                if not income_dst_items_dict.has_key( income_dst ):
+                    init_list = [ 0.0 ] * len( category_label_list )
+                    income_dst_items_dict[ income_dst ] = init_list
+
+                index = category_label_list.index( category_label )
+                income_dst_items_dict[ income_dst ][ index ] += income_price
+
+
+                # 口座別: 振替
+                if not transfer_items_dict.has_key( transfer_label ):
+                    init_list = [ 0.0 ] * len( transfer_label_list )
+                    transfer_items_dict[ transfer_label ] = init_list
+
+                index = transfer_label_list.index( transfer_label )
+                transfer_items_dict[ transfer_label ][ index ] += transfer_price
+
 
             time_list = sorted( time_list )
 
@@ -250,9 +289,11 @@ function drawChart() {{
 
             for id, item in enumerate(
                 [
-                    [ u'カテゴリ別', payment_label_list, category_items_dict, 600 ]
+                    [ u'カテゴリ別: 支出', payment_label_list, category_items_dict, 600 ]
                 ] + category_main_data_list + [
-                    [ u'口座別', category_label_list, payment_src_items_dict, 600 ]
+                    [ u'口座別: 支出', category_label_list, payment_src_items_dict, 600 ],
+                    [ u'口座別: 収入', category_label_list, income_dst_items_dict, 600 ],
+                    [ u'口座別: 振替', transfer_label_list, transfer_items_dict, 600 ]
                 ]
             ):
 
@@ -315,6 +356,15 @@ function drawChart() {{
                         'height': height,
                     }
                 ) )
+
+                """
+    <Table>
+        <tr>
+            <td><div id="A_week" style="width: 900px; height: 140px;"></div></td>
+            <td><div id="A_day" style="width: 900px; height: 140px;"></div></td>
+        </tr>
+    </Table>
+                """
 
                 div_line_list.append( get_html_div_line_tmp().format(
                     **{ 'id': u'data{0:02d}'.format( id ) }
