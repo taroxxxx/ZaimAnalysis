@@ -309,7 +309,7 @@ function drawChart() {{
                 )
 
 
-            # カテゴリの金額順に
+            # 指定 カテゴリの金額順に
             specified_category_main_key_item_list = []
             for specified_category_main_key in specified_category_main_items_items_dict:
 
@@ -329,7 +329,7 @@ function drawChart() {{
             for specified_category_main_key in specified_category_main_key_list:
                 specified_category_main_data_list.append(
                     [
-                        u'{0}:{1}'.format( specified_payment_label, u','.join( specified_category_sub_list ) ),
+                        u'{0}:{1}'.format( specified_payment_label, u'+'.join( specified_category_sub_list ) ),
                         specified_payment_label_list,
                         specified_category_main_items_items_dict[ specified_category_main_key ],
                         300
@@ -404,7 +404,7 @@ function drawChart() {{
 
                 script_line_list.append( get_html_chart_script_line_tmp().format(
                     **{
-                        'title': u'{0}: ¥{1}'.format( input_first_label, int(total_payment) ),
+                        'title': u'{0} = ¥{1}'.format( input_first_label, int(total_payment) ),
                         'datas': u',\n'.join( data_row_list ),
                         'id': u'data{0:02d}'.format( id ),
                         'width': 1800,
