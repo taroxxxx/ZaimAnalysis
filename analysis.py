@@ -185,6 +185,14 @@ function drawChart() {{
             income_dst_items_dict = {} # 収入: 口座:
             transfer_items_dict = {} # 振替
 
+            specified_category_main_list = [ u'食費' ]
+            specified_category_sub_list = [ u'外食(昼)', u'間食', u'飲料' ]
+            specified_payment_label = u'和'
+            specified_payment_label_list = [
+                label for label in payment_label_list if re.match( specified_payment_label, label ) != None
+            ]
+            specified_category_main_items_items_dict = {} # 指定した 支出: カテゴリ
+
             time_list = []
 
             for line in lines[1:]: # 0 = columun 列 除外
@@ -224,6 +232,23 @@ function drawChart() {{
 
                 index = payment_label_list.index( payment_src )
                 category_main_items_items_dict[ category_main ][ category_sub ][ index ] += payment_price
+
+
+
+                # 指定した カテゴリ/内訳別: 口座毎の支出
+                if category_main in specified_category_main_list :
+                    if not specified_category_main_items_items_dict.has_key( category_main ):
+                        specified_category_main_items_items_dict[ category_main ] = {}
+
+                    if category_sub in specified_category_sub_list :
+                        if not specified_category_main_items_items_dict[ category_main ].has_key( category_sub ):
+                            init_list = [ 0.0 ] * len( specified_payment_label_list )
+                            specified_category_main_items_items_dict[ category_main ][ category_sub ] = init_list
+
+                        if payment_src in specified_payment_label_list:
+                            index = specified_payment_label_list.index( payment_src )
+                            specified_category_main_items_items_dict[ category_main ][ category_sub ][ index ] += payment_price
+
 
 
                 # 口座別: カテゴリ毎の支出
@@ -283,6 +308,36 @@ function drawChart() {{
                     ]
                 )
 
+
+            # カテゴリの金額順に
+            specified_category_main_key_item_list = []
+            for specified_category_main_key in specified_category_main_items_items_dict:
+
+                total_payment = 0.0
+                for category_sub_key in specified_category_main_items_items_dict[ specified_category_main_key ]:
+                    payment_list = specified_category_main_items_items_dict[ specified_category_main_key ][ category_sub_key ]
+                    total_payment += sum( payment_list )
+
+                specified_category_main_key_item_list.append( [ specified_category_main_key, total_payment ] )
+
+            specified_category_main_key_item_list = sorted( specified_category_main_key_item_list, key=itemgetter( 1 ) )
+            specified_category_main_key_list = [ item[0] for item in specified_category_main_key_item_list ]
+            specified_category_main_key_list = sorted( specified_category_main_key_list, reverse=1 ) # 金額が高い順に
+
+            # カテゴリ ごとに分ける
+            specified_category_main_data_list = []
+            for specified_category_main_key in specified_category_main_key_list:
+                specified_category_main_data_list.append(
+                    [
+                        u'{0}:{1}'.format( specified_payment_label, u','.join( specified_category_sub_list ) ),
+                        specified_payment_label_list,
+                        specified_category_main_items_items_dict[ specified_category_main_key ],
+                        300
+                    ]
+                )
+            #print specified_category_main_data_list
+
+
             # Chart script line の作成
             div_line_list = []
             script_line_list = []
@@ -290,7 +345,7 @@ function drawChart() {{
             for id, item in enumerate(
                 [
                     [ u'カテゴリ別: 支出', payment_label_list, category_items_dict, 600 ]
-                ] + category_main_data_list + [
+                ] + specified_category_main_data_list + category_main_data_list + [
                     [ u'口座別: 支出', category_label_list, payment_src_items_dict, 600 ],
                     [ u'口座別: 収入', category_label_list, income_dst_items_dict, 600 ],
                     [ u'口座別: 振替', transfer_label_list, transfer_items_dict, 600 ]
